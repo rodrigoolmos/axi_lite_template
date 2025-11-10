@@ -353,15 +353,15 @@ class axi_lite_master #(parameter ADDR_WIDTH = 32, DATA_WIDTH = 32);
 
         if (sel == 0) begin
             axi_vif.awvalid    = 1;
-            repeat (3) @(posedge axi_vif.clk) #1step;
+            repeat ($urandom_range(0, 3)) @(posedge axi_vif.clk) #1step;
             axi_vif.wvalid     = 1;
-            repeat (3) @(posedge axi_vif.clk) #1step;
+            repeat ($urandom_range(0, 3)) @(posedge axi_vif.clk) #1step;
             axi_vif.bready     = 1;
         end else if (sel == 1) begin
             axi_vif.wvalid     = 1;
-            repeat (3) @(posedge axi_vif.clk) #1step;
+            repeat ($urandom_range(0, 3)) @(posedge axi_vif.clk) #1step;
             axi_vif.awvalid    = 1;
-            repeat (3) @(posedge axi_vif.clk) #1step;
+            repeat ($urandom_range(0, 3)) @(posedge axi_vif.clk) #1step;
             axi_vif.bready     = 1;
         end else begin
             axi_vif.awvalid    = 1;

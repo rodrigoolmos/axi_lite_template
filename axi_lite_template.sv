@@ -3,7 +3,7 @@ module axi_lite_template #(
     parameter integer C_DATA_WIDTH = 32
 )(
     input  logic                     clk,
-    input  logic                     rst,
+    input  logic                     nrst,
 
     // AXI4-Lite SLAVE
     input  logic [C_ADDR_WIDTH-1:0]  awaddr,
@@ -49,8 +49,8 @@ module axi_lite_template #(
     state_read state_r;
 
     // READ CHANNEL
-    always_ff @(posedge clk or negedge rst) begin
-        if (!rst) begin
+    always_ff @(posedge clk or negedge nrst) begin
+        if (!nrst) begin
             arready     <= 0;
             araddr_reg  <= 0;
             rdata       <= 0;
@@ -96,8 +96,8 @@ module axi_lite_template #(
 
 
     // WRITE CHANNEL
-    always_ff @(posedge clk or negedge rst) begin
-        if (!rst) begin
+    always_ff @(posedge clk or negedge nrst) begin
+        if (!nrst) begin
             awready     <= 0;
             wready      <= 0;
             bvalid      <= 0;

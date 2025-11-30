@@ -5,7 +5,7 @@ interface axi_if #(
 	parameter integer ADDR_WIDTH	= 4
 );
 	logic                           clk;
-	logic                           rst;
+	logic                           nrst;
 
 	logic [ADDR_WIDTH-1 : 0]        awaddr;
 	logic [2 : 0]                   awprot;
@@ -33,12 +33,12 @@ interface axi_if #(
     // Handshakes //
     //////////////////////////////////////////////////
     property handshake_occurs_before_valid_falls (logic valid, logic ready);
-    @(posedge clk) disable iff (!rst)
+    @(posedge clk) disable iff (!nrst)
         $rose(valid) |-> valid until_with (valid && ready);
     endproperty
 
     property handshake_single_pulse (logic valid, logic ready);
-    @(posedge clk) disable iff (!rst)
+    @(posedge clk) disable iff (!nrst)
         (valid && ready) |=> !(valid && ready);
     endproperty
 
@@ -77,8 +77,8 @@ interface axi_if #(
     assign b_hs  = bvalid  && bready;
     assign complete_w = aw_seen && w_seen;
 
-    always_ff @(posedge clk or negedge rst) begin
-        if (!rst) begin
+    always_ff @(posedge clk or negedge nrst) begin
+        if (!nrst) begin
             aw_seen    <= 0;
             w_seen     <= 0;
             wr_credits <= 0;
@@ -100,28 +100,28 @@ interface axi_if #(
         end
     end
 
-    BVALID_simultaneous: assert property (@(posedge clk) disable iff (!rst)
+    BVALID_simultaneous: assert property (@(posedge clk) disable iff (!nrst)
         $rose(b_hs) |-> !(aw_hs || w_hs))
         else $error("BVALID handshake simultaneous on AW or W handshake");
 
-    BVALID_without_prior_AW_and_W: assert property (@(posedge clk) disable iff (!rst)
+    BVALID_without_prior_AW_and_W: assert property (@(posedge clk) disable iff (!nrst)
         $rose(b_hs) |-> (complete_w))
         else $error("BVALID handshake without prior AW and W handshakes");
 
     parameter int MAX_LAT_B = 64;
-    timeout_B: assert property (@(posedge clk) disable iff (!rst)
+    timeout_B: assert property (@(posedge clk) disable iff (!nrst)
         $rose(complete_w) |-> ##[1:MAX_LAT_B] $rose(bvalid))
         else $error("B did not arrive in %0d cycles after AW&W", MAX_LAT_B);
 
-    Write_credits: assert property (@(posedge clk) disable iff (!rst)
+    Write_credits: assert property (@(posedge clk) disable iff (!nrst)
         wr_credits inside {[0:1]})
         else $error("Write credits exceeded maximum of 1");
 
-    BVALID_fell_BREADY: assert property (@(posedge clk) disable iff (!rst)
+    BVALID_fell_BREADY: assert property (@(posedge clk) disable iff (!nrst)
         bvalid && !bready |=> bvalid)
         else $error("BVALID fell before BREADY");
 
-    stable_bresp: assert property (@(posedge clk) disable iff (!rst)
+    stable_bresp: assert property (@(posedge clk) disable iff (!nrst)
         bvalid && !bready |=> $stable(bresp))
         else $error("BRESP changed without handshake");
 
@@ -131,7 +131,7 @@ interface axi_if #(
     //////////////////////////////////////////////////
 
     property rdata_stable;
-    @(posedge clk) disable iff (!rst)
+    @(posedge clk) disable iff (!nrst)
         (rvalid && !rready) |=> $stable(rdata);
     endproperty
     stable_rdata: assert property(rdata_stable)
@@ -139,38 +139,38 @@ interface axi_if #(
 
 
     // Directions
-    assert property (@(posedge clk) disable iff (!rst)
+    assert property (@(posedge clk) disable iff (!nrst)
         (arvalid && !arready) |=> $stable(araddr) && $stable(arprot));
 
-    assert property (@(posedge clk) disable iff (!rst)
+    assert property (@(posedge clk) disable iff (!nrst)
         (awvalid && !awready) |=> $stable(awaddr) && $stable(awprot));
 
     // Data and Strobes
-    assert property (@(posedge clk) disable iff (!rst)
+    assert property (@(posedge clk) disable iff (!nrst)
         (wvalid && !wready) |=> $stable(wdata) && $stable(wstrb));
 
     // Responses
-    assert property (@(posedge clk) disable iff (!rst)
+    assert property (@(posedge clk) disable iff (!nrst)
         (rvalid && !rready) |=> $stable(rdata) && $stable(rresp));
-    assert property (@(posedge clk) disable iff (!rst)
+    assert property (@(posedge clk) disable iff (!nrst)
         (bvalid && !bready) |=> $stable(bresp));
 
     // Response values
-    assert property (@(posedge clk) disable iff (!rst)
+    assert property (@(posedge clk) disable iff (!nrst)
         rvalid |-> (rresp inside {2'b00, 2'b10, 2'b11}));
 
-    assert property (@(posedge clk) disable iff (!rst)
+    assert property (@(posedge clk) disable iff (!nrst)
      bvalid |-> (bresp inside {2'b00, 2'b10, 2'b11}));
 
 
      // unknown values
-    assert property (@(posedge clk) disable iff (!rst)
+    assert property (@(posedge clk) disable iff (!nrst)
     !$isunknown({awaddr, awprot, awvalid, awready,
                 wdata, wstrb, wvalid, wready,
                 bresp, bvalid, bready,
                 araddr, arprot, arvalid, arready,
                 rdata, rresp, rvalid, rready,
-                clk, rst}))
+                clk, nrst}))
     else $error("AXI-Lite interface contains X/Z values");
 
     //////////////////////////////////////////////////
@@ -182,8 +182,8 @@ interface axi_if #(
 
     // Créditos lectura: como mucho 1 en vuelo
     int rd_credits;
-    always_ff @(posedge clk or negedge rst) begin
-        if (!rst) begin
+    always_ff @(posedge clk or negedge nrst) begin
+        if (!nrst) begin
             rd_credits <= 0;
         end else begin
             if (ar_hs) rd_credits <= rd_credits + 1;
@@ -191,42 +191,42 @@ interface axi_if #(
         end
     end
 
-    R_no_R_without_AR: assert property (@(posedge clk) disable iff (!rst)
+    R_no_R_without_AR: assert property (@(posedge clk) disable iff (!nrst)
         $rose(rvalid) |-> $past(rd_credits) > 0)
         else $error("RVALID without prior AR");
 
     parameter int MAX_LAT_R = 64;
-    R_timeout: assert property (@(posedge clk) disable iff (!rst)
+    R_timeout: assert property (@(posedge clk) disable iff (!nrst)
         $rose(ar_hs) |-> ##[1:MAX_LAT_R] $rose(rvalid))
         else $error("R did not arrive in %0d cycles after AR", MAX_LAT_R);
 
-    R_hs_one_cycle: assert property (@(posedge clk) disable iff (!rst)
+    R_hs_one_cycle: assert property (@(posedge clk) disable iff (!nrst)
         (rvalid && rready) |=> !(rvalid && rready))
         else $error("R handshake repeated on consecutive cycles");
 
-    R_valid_holds: assert property (@(posedge clk) disable iff (!rst)
+    R_valid_holds: assert property (@(posedge clk) disable iff (!nrst)
         $rose(rvalid) |-> rvalid until_with (rvalid && rready))
         else $error("RVALID fell before RREADY");
 
-    R_not_same_cycle_as_AR: assert property (@(posedge clk) disable iff (!rst)
+    R_not_same_cycle_as_AR: assert property (@(posedge clk) disable iff (!nrst)
         $rose(r_hs) |-> !ar_hs)
         else $error("R handshake simultaneous with AR handshake");
 
-    R_resp_stable: assert property (@(posedge clk) disable iff (!rst)
+    R_resp_stable: assert property (@(posedge clk) disable iff (!nrst)
         (rvalid && !rready) |=> $stable(rresp))
         else $error("RRESP changed without handshake");
 
-    R_credits_range: assert property (@(posedge clk) disable iff (!rst)
+    R_credits_range: assert property (@(posedge clk) disable iff (!nrst)
         rd_credits inside {[0:1]})
         else $error("More than one outstanding read in AXI-Lite");
 
     // Address alignment
 
-    araddr_aligned: assert property (@(posedge clk) disable iff (!rst)
+    araddr_aligned: assert property (@(posedge clk) disable iff (!nrst)
     ar_hs |-> (araddr[($clog2(DATA_WIDTH/8)-1):0] == 0))
     else $error("ARADDR not aligned");
 
-    awaddr_aligned: assert property (@(posedge clk) disable iff (!rst)
+    awaddr_aligned: assert property (@(posedge clk) disable iff (!nrst)
     aw_hs |-> (awaddr[($clog2(DATA_WIDTH/8)-1):0] == 0))
     else $error("AWADDR not aligned");
 
@@ -241,24 +241,24 @@ interface axi_if #(
     parameter int MAX_LAT_C = 4;
 
     // Same cycle (AW and W handshakes in the same cycle)
-    AW_W_same_cycle: cover property (@(posedge clk) disable iff (!rst)
+    AW_W_same_cycle: cover property (@(posedge clk) disable iff (!nrst)
         aw_hs && w_hs);
 
     // AW before W (excluding same-cycle)
-    AW_before_W_no_simul: cover property (@(posedge clk) disable iff (!rst)
+    AW_before_W_no_simul: cover property (@(posedge clk) disable iff (!nrst)
         aw_hs ##[1:MAX_LAT_C] w_hs);
 
     // W before AW (excluding same-cycle)
-    W_before_AW_no_simul: cover property (@(posedge clk) disable iff (!rst)
+    W_before_AW_no_simul: cover property (@(posedge clk) disable iff (!nrst)
         w_hs ##[1:MAX_LAT_C] aw_hs);
 
-    arvalid_rready_before: cover property (@(posedge clk) disable iff (!rst)
+    arvalid_rready_before: cover property (@(posedge clk) disable iff (!nrst)
         $rose(arvalid) ##[1:MAX_LAT_C] $rose(rready));
 
-    arvalid_rready_after: cover property (@(posedge clk) disable iff (!rst)
+    arvalid_rready_after: cover property (@(posedge clk) disable iff (!nrst)
         $rose(rready) ##[1:MAX_LAT_C] $rose(arvalid));
 
-    arvalid_rready_same_cycle: cover property (@(posedge clk) disable iff (!rst)
+    arvalid_rready_same_cycle: cover property (@(posedge clk) disable iff (!nrst)
         $rose(arvalid) && $rose(rready));
 
 endinterface

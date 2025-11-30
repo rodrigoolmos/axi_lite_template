@@ -25,7 +25,7 @@ module tb_axi_lite;
         .C_ADDR_WIDTH(ADDR_WIDTH)
     ) dut (
         .clk    (axi_if.clk),
-        .rst    (axi_if.rst),
+        .nrst    (axi_if.nrst),
 
         // AXI4-Lite SLAVE
         .awaddr (axi_if.awaddr),
@@ -61,15 +61,15 @@ module tb_axi_lite;
 
     // Reset generation and initialization
     initial begin
-        axi_if.rst = 0;
+        axi_if.nrst = 0;
         master = new(axi_if);
         #100 @(posedge axi_if.clk);
-        axi_if.rst = 1;
+        axi_if.nrst = 1;
         @(posedge axi_if.clk);
     end
 
     initial begin
-        @(posedge axi_if.rst);
+        @(posedge axi_if.nrst);
         @(posedge axi_if.clk);
 
         for (int i=0; i<32; ++i) begin

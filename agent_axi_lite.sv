@@ -1,8 +1,7 @@
-
 interface axi_if #(
 
 	parameter integer DATA_WIDTH	= 32,
-	parameter integer ADDR_WIDTH	= 4
+	parameter integer ADDR_WIDTH	= 32
 );
 	logic                           clk;
 	logic                           nrst;
@@ -263,149 +262,148 @@ interface axi_if #(
 
 endinterface
 
-class axi_lite_master #(parameter ADDR_WIDTH = 32, DATA_WIDTH = 32);
+class axi_lite_master #(
+    parameter int ADDR_WIDTH = 32,
+    parameter int DATA_WIDTH = 32
+);
 
     virtual axi_if #(
         .ADDR_WIDTH(ADDR_WIDTH),
         .DATA_WIDTH(DATA_WIDTH)
-    ) axi_vif;
+    ) vif;
 
-    function new(
-        virtual axi_if #(
-          .ADDR_WIDTH(ADDR_WIDTH),
-          .DATA_WIDTH(DATA_WIDTH)
-        ) axi_vif_in = null
-        );
-        this.axi_vif = axi_vif_in;
-
-        this.axi_vif.awaddr  = 0;
-        this.axi_vif.awprot  = 0;
-        this.axi_vif.awvalid = 0;
-        this.axi_vif.wdata   = 0;
-        this.axi_vif.wstrb   = 0;
-        this.axi_vif.wvalid  = 0;
-        this.axi_vif.bready  = 0;
-        this.axi_vif.araddr  = 0;
-        this.axi_vif.arprot  = 0;
-        this.axi_vif.arvalid = 0;
-        this.axi_vif.rready  = 0;
-
+    function new(virtual axi_if #(
+                    .ADDR_WIDTH(ADDR_WIDTH),
+                    .DATA_WIDTH(DATA_WIDTH)
+                ) vif = null);
+        this.vif = vif;
     endfunction
 
+    // UVM-like connect phase
+    function void connect_if(virtual axi_if #(
+                                .ADDR_WIDTH(ADDR_WIDTH),
+                                .DATA_WIDTH(DATA_WIDTH)
+                            ) vif);
+        this.vif = vif;
+    endfunction
+
+    // Initialize interface signals
+    task reset_if();
+        vif.awaddr  = '0;
+        vif.awprot  = '0;
+        vif.awvalid = 0;
+        vif.wdata   = '0;
+        vif.wstrb   = '0;
+        vif.wvalid  = 0;
+        vif.bready  = 0;
+        vif.araddr  = '0;
+        vif.arprot  = '0;
+        vif.arvalid = 0;
+        vif.rready  = 0;
+    endtask
+
     task init_read();
-        int sel;
-        sel = $urandom_range(0, 2);
+        int sel = $urandom_range(0, 2);
+        vif.arprot = 0;
 
         if (sel == 0) begin
-            axi_vif.arvalid   = 1;
-            repeat ($urandom_range(0,4)) @(posedge axi_vif.clk) #1step;
-            axi_vif.rready    = 1;
-        end else if(sel == 1) begin
-            axi_vif.rready    = 1;
-            repeat ($urandom_range(0,4)) @(posedge axi_vif.clk) #1step;
-            axi_vif.arvalid   = 1;
+            vif.arvalid = 1;
+            repeat ($urandom_range(0,4)) @(posedge vif.clk) #1step;
+            vif.rready  = 1;
+        end else if (sel == 1) begin
+            vif.rready  = 1;
+            repeat ($urandom_range(0,4)) @(posedge vif.clk) #1step;
+            vif.arvalid = 1;
         end else begin
-            axi_vif.arvalid   = 1;
-            axi_vif.rready    = 1;
+            vif.arvalid = 1;
+            vif.rready  = 1;
         end
     endtask
 
-    task hs_read(ref logic [31:0] data);
-        // WAIT HANDSHAKE ADDR AND DATA
+    task hs_read(ref logic [DATA_WIDTH-1:0] data);
         fork
             begin
-                @(posedge axi_vif.clk iff axi_vif.arready && axi_vif.arvalid);
-                axi_vif.arvalid = 0;
+                @(posedge vif.clk iff vif.arready && vif.arvalid);
+                vif.arvalid = 0;
             end
             begin
-                // WAIT HANDSHAKE RESP AND READ RESP
-                @(posedge axi_vif.clk iff axi_vif.rvalid && axi_vif.rready);
-                data = axi_vif.rdata;
-                axi_vif.rready = 0;
+                @(posedge vif.clk iff vif.rvalid && vif.rready);
+                data       = vif.rdata;
+                vif.rready = 0;
             end
         join
     endtask
 
-    task automatic read(ref logic [31:0] data, input bit [31:0] addr);
-        // INITIALIZE TRANSACTION
-        axi_vif.araddr    = addr;
+    task automatic read(ref logic [DATA_WIDTH-1:0] data,
+                        input logic [ADDR_WIDTH-1:0] addr);
+        vif.araddr = addr;
 
         fork
-            begin
-                init_read();
-            end
-            begin
-                hs_read(data);
-            end
+            init_read();
+            hs_read(data);
         join
 
-        if (axi_vif.rresp != 0)
-            $error("AXI write failed, BRESP=%0b", axi_vif.rresp);
+        if (vif.rresp != 0)
+            $error("AXI read failed, RRESP=%0b", vif.rresp);
 
-        axi_vif.rready    = 0;
-        @(posedge axi_vif.clk);
+        @(posedge vif.clk);
     endtask
 
     task init_write();
-
-        int sel;
-        sel = $urandom_range(0, 2);
+        int sel = $urandom_range(0, 2);
+        vif.awprot = 0;
 
         if (sel == 0) begin
-            axi_vif.awvalid    = 1;
-            repeat ($urandom_range(0, 3)) @(posedge axi_vif.clk) #1step;
-            axi_vif.wvalid     = 1;
-            repeat ($urandom_range(0, 3)) @(posedge axi_vif.clk) #1step;
-            axi_vif.bready     = 1;
+            vif.awvalid = 1;
+            repeat ($urandom_range(0, 3)) @(posedge vif.clk) #1step;
+            vif.wvalid  = 1;
+            repeat ($urandom_range(0, 3)) @(posedge vif.clk) #1step;
+            vif.bready  = 1;
         end else if (sel == 1) begin
-            axi_vif.wvalid     = 1;
-            repeat ($urandom_range(0, 3)) @(posedge axi_vif.clk) #1step;
-            axi_vif.awvalid    = 1;
-            repeat ($urandom_range(0, 3)) @(posedge axi_vif.clk) #1step;
-            axi_vif.bready     = 1;
+            vif.wvalid  = 1;
+            repeat ($urandom_range(0, 3)) @(posedge vif.clk) #1step;
+            vif.awvalid = 1;
+            repeat ($urandom_range(0, 3)) @(posedge vif.clk) #1step;
+            vif.bready  = 1;
         end else begin
-            axi_vif.awvalid    = 1;
-            axi_vif.wvalid     = 1;
-            axi_vif.bready     = 1;
+            vif.awvalid = 1;
+            vif.wvalid  = 1;
+            vif.bready  = 1;
         end
     endtask
 
     task hs_write();
-        // WAIT HANDSHAKE ADDR AND DATA
         fork
-            begin
-                @(posedge axi_vif.clk iff axi_vif.awready && axi_vif.awvalid);
-                axi_vif.awvalid = 0;
-            end
-            begin
-                @(posedge axi_vif.clk iff axi_vif.wready && axi_vif.wvalid);
-                axi_vif.wvalid = 0;
-            end
-            begin
-                // WAIT HANDSHAKE RESP AND READ RESP
-                @(posedge axi_vif.clk iff axi_vif.bvalid && axi_vif.bready);
-                if (axi_vif.bresp != 0)
-                    $error("AXI write failed, BRESP=%0b", axi_vif.bresp);
-                axi_vif.bready = 0;
-            end
+        begin
+            @(posedge vif.clk iff vif.awready && vif.awvalid);
+            vif.awvalid = 0;
+        end
+        begin
+            @(posedge vif.clk iff vif.wready && vif.wvalid);
+            vif.wvalid  = 0;
+        end
+        begin
+            @(posedge vif.clk iff vif.bvalid && vif.bready);
+            if (vif.bresp != 0)
+            $error("AXI write failed, BRESP=%0b", vif.bresp);
+            vif.bready = 0;
+        end
         join
     endtask
 
-    task automatic write(input bit [31:0] data, input bit [31:0] addr, input bit[3:0] strobe);
-        // INITIALIZE TRANSACTION
-        axi_vif.awaddr     = addr;
-        axi_vif.wdata      = data;
-        axi_vif.wstrb      = strobe;
+    task automatic write(input  logic [DATA_WIDTH-1:0]      data,
+                        input  logic [ADDR_WIDTH-1:0]      addr,
+                        input  logic [DATA_WIDTH/8-1:0]    strobe);
+        vif.awaddr = addr;
+        vif.wdata  = data;
+        vif.wstrb  = strobe;
+
         fork
-            begin
-                init_write();
-            end
-            begin
-                hs_write();
-            end
+        init_write();
+        hs_write();
         join
 
-        @(posedge axi_vif.clk);
+        @(posedge vif.clk);
     endtask
 
 endclass

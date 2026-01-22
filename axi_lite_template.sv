@@ -36,7 +36,7 @@ module axi_lite_template #(
     localparam ADDR_LSB     = $clog2(BYTES); 
     localparam IDX_WIDTH    = (C_ADDR_WIDTH>ADDR_LSB)? (C_ADDR_WIDTH-ADDR_LSB):1;
 
-    logic [C_DATA_WIDTH-1:0]    reg_array [0:31];
+    logic [C_DATA_WIDTH-1:0]    reg_array [0:(1<<IDX_WIDTH)-1];
     logic [C_ADDR_WIDTH-1:0]    araddr_reg;
     logic [C_ADDR_WIDTH-1:0]    awaddr_reg;
     logic [C_DATA_WIDTH-1:0]    wdata_reg;
@@ -106,6 +106,7 @@ module axi_lite_template #(
             wdata_reg   <= 0;
             wstrb_reg   <= 0;
             state_w     <= IDLE_WRITE;
+            reg_array   <= '{default: '0};
         end else begin
             case (state_w)
                 IDLE_WRITE: begin
